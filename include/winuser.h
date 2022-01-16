@@ -4442,7 +4442,7 @@ struct user_api_hook
     LRESULT (WINAPI *pScrollBarWndProc)(HWND, UINT, WPARAM, LPARAM, BOOL);
 };
 
-WINUSERAPI BOOL WINAPI RegisterUserApiHook(const struct user_api_hook *new, struct user_api_hook *old);
+WINUSERAPI BOOL WINAPI RegisterUserApiHook(const struct user_api_hook *newHook, struct user_api_hook *oldHook);
 WINUSERAPI void WINAPI UnregisterUserApiHook(void);
 #endif
 
