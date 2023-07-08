@@ -25,6 +25,10 @@
 #define WINVER 0x0500
 #endif
 
+#ifdef __HAIKU__
+	#include <stdarg.h>
+#endif
+
 #ifndef NO_STRICT
 # ifndef STRICT
 #  define STRICT

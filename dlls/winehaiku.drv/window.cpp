@@ -483,7 +483,11 @@ WineApplication::WineApplication(): BApplication("application/x-vnd.Test-Wine")
 DWORD sAppThread = 0;
 std::map<HWND, WineWindow*> *sWindows;
 
+#ifdef __i386__
+static LPTHREAD_START_ROUTINE AppThread(void *arg)
+#else
 static UINT CALLBACK AppThread(void *arg)
+#endif
 {
 	rename_thread(find_thread(NULL), "application");
 	be_app->Lock();
@@ -502,11 +506,15 @@ BOOL HaikuStartApplication()
 
 	new WineApplication();
 	be_app->Unlock();
-	CloseHandle(CreateThread(NULL, 0, AppThread, NULL, 0, &sAppThread));
+	CloseHandle(CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE) AppThread, NULL, 0, &sAppThread));
 	return TRUE;
 }
 
+#ifdef __i386__
+static LPTHREAD_START_ROUTINE WindowThread(void *arg)
+#else
 static UINT CALLBACK WindowThread(void *arg)
+#endif
 {
 	rename_thread(find_thread(NULL), "window");
 	auto wnd = (WineWindow*)arg;
@@ -531,7 +539,7 @@ WineWindow* HaikuThisWindow(HWND hwnd, bool create)
 	(*sWindows)[hwnd] = window;
 	mutex_lock(&window->fCreateMutex);
 	window->Unlock();
-	CloseHandle(CreateThread(NULL, 0, WindowThread, window, 0, &sAppThread));
+	CloseHandle(CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE) WindowThread, window, 0, &sAppThread));
 	mutex_lock(&window->fCreateMutex);
 	return window;
 }
