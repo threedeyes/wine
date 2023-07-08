@@ -50,6 +50,19 @@
 #ifdef HAVE_SYS_UCONTEXT_H
 # include <sys/ucontext.h>
 #endif
+#ifdef __HAIKU__
+# include <SupportDefs.h>
+#if 0
+# include <private/system/syscalls.h>
+# include <private/system/arch/x86/arch_thread_defs.h>
+#else
+#define THREAD_SYSCALLS			"thread"
+#define THREAD_SET_GS_BASE		1
+
+extern status_t		_kern_generic_syscall(const char *subsystem, uint32 function,
+						void *buffer, size_t bufferSize);
+#endif
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -377,6 +390,33 @@ static inline int set_thread_area( struct modify_ldt_s *ptr )
 #define ERROR_sig(context)   ((context)->uc_mcontext.gregs[REG_ERR])
 
 #define FPU_sig(context)     ((FLOATING_SAVE_AREA *)&(context)->uc_mcontext.fpregs.fp_reg_set.fpchip_state)
+#define FPUX_sig(context)    NULL
+#define XState_sig(context)  NULL  /* FIXME */
+
+#elif defined (__HAIKU__)
+
+#define EAX_sig(context)     ((context)->uc_mcontext.eax)
+#define EBX_sig(context)     ((context)->uc_mcontext.ebx)
+#define ECX_sig(context)     ((context)->uc_mcontext.ecx)
+#define EDX_sig(context)     ((context)->uc_mcontext.edx)
+#define ESI_sig(context)     ((context)->uc_mcontext.esi)
+#define EDI_sig(context)     ((context)->uc_mcontext.edi)
+#define EBP_sig(context)     ((context)->uc_mcontext.ebp)
+#define ESP_sig(context)     ((context)->uc_mcontext.esp)
+
+#define CS_sig(context)      NULL // FIXME ((new_extended_regs) ((context)->uc_mcontext.xregs.state)).fp_cs)
+#define DS_sig(context)      NULL // FIXME ((context)->uc_mcontext.ds)
+#define ES_sig(context)      NULL // FIXME ((context)->uc_mcontext.es)
+#define SS_sig(context)      NULL // FIXME ((context)->uc_mcontext.ss)
+#define FS_sig(context)      NULL // FIXME ((context)->uc_mcontext.fs)
+#define GS_sig(context)      NULL // FIXME ((context)->uc_mcontext.gs)
+
+#define EFL_sig(context)     ((context)->uc_mcontext.eflags)
+#define EIP_sig(context)     ((context)->uc_mcontext.eip)
+#define TRAP_sig(context)    TRAP_x86_PAGEFLT
+#define ERROR_sig(context)   0
+
+#define FPU_sig(context)     NULL //((XMM_SAVE_AREA32 *)&((new_extended_regs) (context)->uc_mcontext.xregs.state).fpu)
 #define FPUX_sig(context)    NULL
 #define XState_sig(context)  NULL  /* FIXME */
 
@@ -823,12 +863,15 @@ static inline void restore_context( const struct xcontext *xcontext, ucontext_t 
     EFL_sig(sigcontext) = context->EFlags;
     EIP_sig(sigcontext) = context->Eip;
     ESP_sig(sigcontext) = context->Esp;
+// FIXME haiku
+#ifndef __HAIKU__
     CS_sig(sigcontext)  = context->SegCs;
     DS_sig(sigcontext)  = context->SegDs;
     ES_sig(sigcontext)  = context->SegEs;
     FS_sig(sigcontext)  = context->SegFs;
     GS_sig(sigcontext)  = context->SegGs;
     SS_sig(sigcontext)  = context->SegSs;
+#endif
 
     if (fpu) *fpu = context->FloatSave;
     if (fpux)
@@ -1259,7 +1302,9 @@ static inline BOOL check_invalid_gs( ucontext_t *sigcontext, CONTEXT *context )
         continue;
     case 0x65:  /* %gs: */
         TRACE( "%04x/%04x at %p, fixing up\n", context->SegGs, system_gs, instr );
+#ifndef __HAIKU__
         GS_sig(sigcontext) = system_gs;
+#endif
         return TRUE;
     default:
         return FALSE;
@@ -1478,12 +1523,16 @@ C_ASSERT( (offsetof(struct stack_layout, xstate) == sizeof(struct stack_layout))
     EIP_sig(sigcontext) = (DWORD)pKiUserExceptionDispatcher;
     /* clear single-step, direction, and align check flag */
     EFL_sig(sigcontext) &= ~(0x100|0x400|0x40000);
+// FIXME
+#ifndef __HAIKU__
     CS_sig(sigcontext)  = get_cs();
+
     DS_sig(sigcontext)  = get_ds();
     ES_sig(sigcontext)  = get_ds();
     FS_sig(sigcontext)  = get_fs();
     GS_sig(sigcontext)  = get_gs();
     SS_sig(sigcontext)  = get_ds();
+#endif
 }
 
 
